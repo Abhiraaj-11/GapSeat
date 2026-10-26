@@ -1,0 +1,316 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f3f5f2">
+  <title>GapSeat — Train Chart Vacancy Checker</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <span class="brand-icon">G</span>
+      <span>GapSeat</span>
+    </a>
+    <span class="free-label"><span class="live-dot"></span> LIVE CHART DATA · NO LOGIN</span>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div class="eyebrow"><span class="eyebrow-line"></span> INDIAN RAILWAYS · CHART INSIGHTS</div>
+      <h1>A clearer view<br>of <span>your journey.</span></h1>
+      <p>
+        Find chart-listed seats for your full route, with coach-level counts
+        and a useful alternative when a seat change may be needed.
+      </p>
+    </section>
+
+    <section class="search-card">
+      <div class="card-heading">
+        <div>
+          <div class="section-kicker">YOUR TRIP</div>
+          <h2>Search the chart</h2>
+        </div>
+        <span class="secure-mark" aria-label="No login required">↗ <span>No login</span></span>
+      </div>
+      <p class="muted">Use the station codes printed on your ticket.</p>
+
+      <form id="search-form">
+        <div class="field">
+          <label for="train_no">Train number</label>
+          <input id="train_no" name="train_no" inputmode="numeric"
+                 pattern="[0-9]{5}" maxlength="5"
+                 placeholder="e.g. 12952" required>
+        </div>
+
+        <div class="field">
+          <label for="travel_date">Journey date</label>
+          <input id="travel_date" name="travel_date" type="date" required>
+        </div>
+
+        <div class="two-columns">
+          <div class="field">
+            <label for="boarding">Boarding station code</label>
+            <input id="boarding" name="boarding" maxlength="10"
+                   placeholder="e.g. MMCT" required>
+          </div>
+          <div class="field">
+            <label for="destination">Destination station code</label>
+            <input id="destination" name="destination" maxlength="10"
+                   placeholder="e.g. NDLS" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="class_code">Travel class</label>
+          <select id="class_code" name="class_code">
+            <option value="">All available classes</option>
+            <option value="1A">1A — First AC</option>
+            <option value="2A">2A — AC 2 Tier</option>
+            <option value="3A">3A — AC 3 Tier</option>
+            <option value="3E">3E — AC 3 Economy</option>
+            <option value="SL">SL — Sleeper</option>
+            <option value="CC">CC — Chair Car</option>
+            <option value="EC">EC — Executive Chair Car</option>
+            <option value="2S">2S — Second Sitting</option>
+          </select>
+        </div>
+
+        <button id="submit-button" type="submit">
+          <span id="button-text">Find available seats</span>
+          <span class="button-arrow" aria-hidden="true">→</span>
+        </button>
+      </form>
+
+      <p class="privacy-note"><span aria-hidden="true">✳</span> Independent tool · No payment details</p>
+    </section>
+
+    <section id="status" class="status" aria-live="polite" hidden></section>
+
+    <section id="results-section" hidden>
+      <div class="results-heading">
+        <div>
+          <div class="section-kicker">YOUR SEARCH</div>
+          <h2 id="train-title">Journey results</h2>
+          <p id="journey-label" class="muted"></p>
+        </div>
+        <span id="result-count" class="count"></span>
+      </div>
+
+      <section id="direct-section" class="detail-panel" hidden>
+        <div class="panel-heading">
+          <div>
+            <h3>Seats available for your full route</h3>
+            <p>Seats listed as vacant for the complete boarding-to-destination journey.</p>
+          </div>
+          <span id="direct-total" class="panel-total"></span>
+        </div>
+        <div class="table-scroll">
+          <table class="detail-table">
+            <thead><tr><th scope="col">Coach</th><th scope="col">Class</th><th scope="col">Seat / berth</th><th scope="col">Position</th><th scope="col">Free for</th></tr></thead>
+            <tbody id="result-rows"></tbody>
+          </table>
+        </div>
+        <button id="view-more" class="view-more" type="button" hidden>
+          <span id="view-more-label">View more seats</span><span aria-hidden="true">⌄</span>
+        </button>
+      </section>
+
+      <section id="itinerary-section" class="itinerary-panel" hidden>
+        <div class="itinerary-callout">
+          <span class="callout-icon" aria-hidden="true">↗</span>
+          <div>
+            <div class="section-kicker">ALTERNATIVE TO CHECK</div>
+            <h3>No single seat covers the full route</h3>
+            <p>A continuous chart-listed option may be possible with a seat change at the station shown. This is not a reservation or confirmation.</p>
+          </div>
+        </div>
+        <div id="itinerary-legs" class="itinerary-legs"></div>
+        <p class="table-footnote">Seat changes require railway approval and depend on the final chart. Confirm with railway staff before travelling.</p>
+      </section>
+
+      <section id="empty-results" class="empty-state" hidden>
+        <span aria-hidden="true">—</span>
+        <div><h3>No continuous option found</h3><p id="empty-message"></p></div>
+      </section>
+    </section>
+
+    <section class="notice">
+      <span class="notice-mark" aria-hidden="true">!</span>
+      <div>
+      <strong>Important travel notice</strong>
+      <p>
+        Chart data can change. Possible vacant seats are not tickets or confirmed
+        allotments. Verify with official railway channels before boarding or changing seats.
+      </p>
+      </div>
+    </section>
+
+    <footer><span class="footer-brand">GapSeat</span><span>Independent journey companion</span><span>Always verify with railway staff</span></footer>
+  </main>
+
+  <script>
+    const form = document.getElementById("search-form");
+    const button = document.getElementById("submit-button");
+    const buttonText = document.getElementById("button-text");
+    const statusBox = document.getElementById("status");
+    const resultsSection = document.getElementById("results-section");
+    const directSection = document.getElementById("direct-section");
+    const itinerarySection = document.getElementById("itinerary-section");
+    const emptyResults = document.getElementById("empty-results");
+    const resultRows = document.getElementById("result-rows");
+    const itineraryLegs = document.getElementById("itinerary-legs");
+    const viewMoreButton = document.getElementById("view-more");
+    const viewMoreLabel = document.getElementById("view-more-label");
+    const visibleSeatLimit = 3;
+    const seatTypeNames = {
+      W: "Window",
+      M: "Middle",
+      S: "Side / aisle",
+      L: "Lower",
+      U: "Upper",
+      LB: "Lower berth",
+      MB: "Middle berth",
+      UB: "Upper berth",
+      SL: "Side lower",
+      SU: "Side upper"
+    };
+
+    // Default to today's date in the browser's local timezone.
+    const now = new Date();
+    const localDate = new Date(
+      now.getTime() - now.getTimezoneOffset() * 60000
+    ).toISOString().slice(0, 10);
+    document.getElementById("travel_date").value = localDate;
+
+    function showStatus(message, kind) {
+      statusBox.hidden = false;
+      statusBox.className = "status " + kind;
+      statusBox.textContent = message;
+    }
+
+    function addTextElement(parent, tag, className, text) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      element.textContent = text;
+      parent.appendChild(element);
+      return element;
+    }
+
+    function renderResults(data) {
+      resultsSection.hidden = false;
+
+      document.getElementById("train-title").textContent =
+        `${data.train_name || "Train"} (${data.train_no})`;
+
+      document.getElementById("journey-label").textContent =
+        `${data.boarding} to ${data.destination} · ${new Date(`${data.travel_date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`;
+
+      document.getElementById("result-count").textContent =
+        data.results.length
+          ? `${data.results.length} full-route options`
+          : data.itinerary?.length
+            ? `${data.itinerary.length} seat-change legs`
+            : "No options";
+
+      resultRows.replaceChildren();
+      directSection.hidden = !data.results.length;
+      document.getElementById("direct-total").textContent =
+        `${data.results.length} ${data.results.length === 1 ? "option" : "options"}`;
+
+      data.results.forEach((item, index) => {
+        const row = document.createElement("tr");
+        if (index >= visibleSeatLimit) {
+          row.classList.add("extra-result");
+          row.hidden = true;
+        }
+        addTextElement(row, "td", "table-coach", item.coach || "Coach not listed");
+        addTextElement(row, "td", "table-class", item.class_code);
+        addTextElement(row, "td", "seat-number", `${item.seat_label} ${item.seat_number}`);
+        addTextElement(row, "td", "table-position", seatTypeNames[item.seat_type] || item.seat_type);
+        addTextElement(row, "td", "table-route", `${item.free_from} → ${item.free_to}`);
+        resultRows.appendChild(row);
+      });
+      viewMoreButton.hidden = data.results.length <= visibleSeatLimit;
+      viewMoreButton.dataset.expanded = "false";
+      viewMoreLabel.textContent = `View all ${data.results.length} seats`;
+
+      itineraryLegs.replaceChildren();
+      const itinerary = data.itinerary || [];
+      itinerarySection.hidden = data.results.length > 0 || itinerary.length === 0;
+      itinerary.forEach((leg, index) => {
+        const card = document.createElement("article");
+        card.className = "leg-card";
+        addTextElement(card, "span", "leg-index", `LEG ${String(index + 1).padStart(2, "0")}`);
+        addTextElement(card, "span", "leg-route", `${leg.from_station} → ${leg.to_station}`);
+        addTextElement(card, "span", "leg-seat", `${leg.coach} · ${leg.class_code} · ${leg.seat_label} ${leg.seat_number}`);
+        addTextElement(card, "span", "leg-position", seatTypeNames[leg.seat_type] || leg.seat_type);
+        itineraryLegs.appendChild(card);
+      });
+
+      const noOption = !data.results.length && !itinerary.length;
+      emptyResults.hidden = !noOption;
+      if (noOption) {
+        document.getElementById("empty-message").textContent =
+          data.message || "No continuous chart-listed option was found for this route.";
+      }
+
+      showStatus(data.message, data.results.length ? "success" : "warning");
+    }
+
+    viewMoreButton.addEventListener("click", () => {
+      const expanded = viewMoreButton.dataset.expanded !== "true";
+      resultRows.querySelectorAll(".extra-result").forEach((row) => {
+        row.hidden = !expanded;
+      });
+      viewMoreButton.dataset.expanded = String(expanded);
+      viewMoreLabel.textContent = expanded
+        ? "Show fewer seats"
+        : `View all ${resultRows.children.length} seats`;
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      resultsSection.hidden = true;
+      button.disabled = true;
+      buttonText.textContent = "Checking live chart…";
+      button.classList.add("is-loading");
+      showStatus(
+        "Fetching chart and route information. This may take a little while.",
+        "loading"
+      );
+
+      const payload = Object.fromEntries(new FormData(form).entries());
+
+      try {
+        const response = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          throw new Error(data.error || "Unable to complete the search.");
+        }
+
+        showStatus(data.message, data.results.length ? "success" : "warning");
+        renderResults(data);
+      } catch (error) {
+        showStatus(
+          error.message || "Network error. Please try again.",
+          "error"
+        );
+      } finally {
+        button.disabled = false;
+        button.classList.remove("is-loading");
+        buttonText.textContent = "Find available seats";
+      }
+    });
+  </script>
+</body>
+</html>
